@@ -15,7 +15,7 @@ ClientOrConsumerSecret = "c577dc3f1bfddfeb28da655892cf5c70"
 TokenURL = "https://api.fitbit.com/oauth2/token"
 
 #I got this from the first verifier part when authorising my application
-AuthorisationCode = "16543da0891d1558b4a03c46510937d56e5266fb"
+AuthorisationCode = ""
 
 #Form the data payload
 BodyText = {'code' : AuthorisationCode,
@@ -45,10 +45,8 @@ try:
         os.remove(token_file)
     f = open(token_file, 'w')
     parsed_json = json.loads(FullResponse)
-    f.write(parsed_json['access_token']+'\n')
-    print parsed_json['access_token']
-    f.write(parsed_json['refresh_token'])
-    print parsed_json['refresh_token']
+    f.write(parsed_json['access_token']+'\n'+parsed_json['refresh_token'])
+#     f.write(parsed_json['refresh_token'])
 except urllib2.URLError as e:
     print e.code
     print e.read()
