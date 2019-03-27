@@ -1,3 +1,0 @@
-[submodule "python-fitbit"]
-	path = python-fitbit
-	url = git@github.com:orcasgit/python-fitbit.git

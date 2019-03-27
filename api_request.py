@@ -10,9 +10,13 @@ import os
 import pprint
 import requests
 from requests import HTTPError
+import fitbit
 
 # This is the Fitbit URL to use for the API call
-FitbitURL = "https://api.fitbit.com/1/user/-/profile.json"
+fitbitURL = "https://api.fitbit.com/1/user/-/profile.json"
+userId = "lvlarco"
+date = "2019-01-01"
+activitiesURL = "https://api.fitbit.com/1/user/{0}/activities/date/{1}.json".format(userId, date)
 # Use this URL to refresh the access token
 TokenURL = "https://api.fitbit.com/oauth2/token"
 # Get and write the tokens from here
@@ -40,9 +44,9 @@ def GetConfig():
     FileObj.close()
     
     # See if the strings have newline characters on the end.  If so, strip them
-    if (AccToken.find("\n") > 0):
+    if AccToken.find("\n") > 0:
         AccToken = AccToken[:-1]
-    if (RefToken.find("\n") > 0):
+    if RefToken.find("\n") > 0:
         RefToken = RefToken[:-1]
     
     # Return values
@@ -66,8 +70,8 @@ def WriteConfig(AccToken,RefToken):
 def GetNewAccessToken(RefToken):
     print "Getting a new access token"
     # Form the data payload
-    BodyText = {'grant_type' : 'refresh_token',
-                'refresh_token' : RefToken}
+    BodyText = {'grant_type': 'refresh_token',
+                'refresh_token': RefToken}
     # URL Encode it
     BodyURLEncoded = urllib.urlencode(BodyText)
     print "Using this as the body when getting access token >>" + BodyURLEncoded
@@ -106,27 +110,20 @@ def GetNewAccessToken(RefToken):
 
 # This makes an API call.  It also catches errors and tries to deal with them
 def MakeAPICall(InURL,AccToken,RefToken):
-    # Start the request
-    req = urllib2.Request(InURL)
     # url = "http://httpbin.org/status/404"
     headerValue = {
         'Authorization': 'Bearer ' + AccToken
     }
     try:
         request = requests.get(InURL, headers=headerValue)
+        activitiesRequest = requests.get(activitiesURL, headers=headerValue)
         request.raise_for_status()
-
-        # Add the access token in the header
-        req.add_header('Authorization', 'Bearer ' + AccToken)
         print("Result code: {0}".format(request.status_code))
         print("Returned data: \n{0}".format(request.content))
-
         # print "I used this access token " + AccToken
-        # response = urllib2.urlopen(req)
-        # FullResponse = response.read()
         return True, request
-    except HTTPError as err: #urllib2.URLError as e:
-        print("Error: {0}".format(err))#HTTP error: " + str(e.code)
+    except HTTPError as err:
+        print("Error: {0}".format(err))
         if err.response.status_code == 401:
             GetNewAccessToken(RefToken)
             return False, TokenRefreshedOK
@@ -141,7 +138,7 @@ print "Fitbit API Test Code"
 
 # Get the config
 AccessToken, RefreshToken = GetConfig()
-MakeAPICall(FitbitURL, AccessToken, RefreshToken)
+MakeAPICall(fitbitURL, AccessToken, RefreshToken)
 
 # # Make the API call
 # APICallOK, APIResponse = MakeAPICall(FitbitURL, AccessToken, RefreshToken)
