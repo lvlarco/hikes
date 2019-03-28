@@ -9,17 +9,17 @@ import json
 
 # These are the secrets etc from Fitbit developer
 OAuthTwoClientID = "22D8Y4"
-ClientOrConsumerSecret = "c577dc3f1bfddfeb28da655892cf5c70"
+ClientOrConsumerSecret = "0891ed91ce01d52e5c89e0da4a83b4e6"
 
 # This is the Fitbit URL
 TokenURL = "https://api.fitbit.com/oauth2/token"
 
 # I got this from the first verifier part when authorising my application
-AuthorisationCode = "8d703f8f8025210d39dfa720af71d1d233df8aba"
+AuthorisationCode = ""
 
 # Form the data payload
 BodyText = {'code': AuthorisationCode,
-            'redirect_uri': 'https://lvlarco.github.io/projects/hikes/hikes',
+            'redirect_uri': 'https://lvlarco.github.io/projects.html',
             'client_id': OAuthTwoClientID,
             'grant_type': 'authorization_code'}
 
