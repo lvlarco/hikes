@@ -13,6 +13,7 @@ from requests import HTTPError
 import fitbit
 import gather_keys_oauth2 as Oauth2
 import datetime
+import pandas as pd
 
 
 fitbitURL = "https://api.fitbit.com/1/user/-/profile.json"
@@ -29,27 +30,17 @@ TokenRefreshedOK = "Token refreshed OK"
 ErrorInAPI = "Error when making API call that I couldn't handle"
 
 
-# Get the config from the config file.  This is the access and refresh tokens
 def GetConfig():
     print "Reading from the config file"
-    
-    # Open the file
     FileObj = open(IniFile,'r')
-    
-    # Read first two lines - first is the access token, second is the refresh token
     AccToken = FileObj.readline()
     RefToken = FileObj.readline()
-    
-    # Close the file
     FileObj.close()
-    
     # See if the strings have newline characters on the end.  If so, strip them
     if AccToken.find("\n") > 0:
         AccToken = AccToken[:-1]
     if RefToken.find("\n") > 0:
         RefToken = RefToken[:-1]
-    
-    # Return values
     return AccToken, RefToken
 
 
@@ -118,7 +109,6 @@ def MakeAPICall(InURL,AccToken,RefToken):
     }
     try:
         request = requests.get(InURL, headers=headerValue)
-        # activitiesRequest = requests.get(activitiesURL, headers=headerValue)
         request.raise_for_status()
         print("Result code: {0}".format(request.status_code))
         print("Returned data: \n{0}".format(request.content))
@@ -131,46 +121,77 @@ def MakeAPICall(InURL,AccToken,RefToken):
             return False, TokenRefreshedOK
         return False, ErrorInAPI
 
-# Main part of the code
-# Declare these global variables that we'll use for the access and refresh tokens
-AccessToken = ""
-RefreshToken = ""
-
-print "Fitbit API Test Code"
-
-# Get the config
-AccessToken, RefreshToken = GetConfig()
-
 # server = Oauth2.OAuth2Server(clientID, clientSecret)
 # server.browser_authorize()
-#
 # ACCESS_TOKEN = str(server.fitbit.client.session.token['access_token'])
-ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIyMkQ4WTQiLCJzdWIiOiI2NUZKUTkiLCJpc3MiOiJGaXRiaXQiLCJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJzY29wZXMiOiJyc29jIHJzZXQgcmFjdCBybG9jIHJ3ZWkgcmhyIHJwcm8gcm51dCByc2xlIiwiZXhwIjoxNTUzNzM0MjkwLCJpYXQiOjE1NTM3MDU0OTB9.E1HKqFsEYxnfb8cG7g9AbsH2r8BXZUvvNgYcqX1vwR0'
-# print('access token: {0}'.format(ACCESS_TOKEN))
 # REFRESH_TOKEN = str(server.fitbit.client.session.token['refresh_token'])
-REFRESH_TOKEN = 'd63389ace1179137f39dba31721232f74f370bdab86be352f426080ab5108ff6'
-# print('access token: {0}'.format(REFRESH_TOKEN))
-auth2_client = fitbit.Fitbit(clientID, clientSecret, oauth2=True,\
-                             access_token=AccessToken, refresh_token=RefreshToken)
-yesterday = str((datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d"))
-today = str(datetime.datetime.now().strftime("%Y-%m-%d"))
-
-body = auth2_client.body()
-activities = auth2_client.activities()
-sleep = auth2_client.sleep()
-
-# headerValue = {
-#         'Authorization': 'Bearer ' + AccessToken
-#     }
-# actURL = 'https://api.fitbit.com/1/user/-/activities/steps/date/2019-03-27/1d/15min'
-# actReq = requests.get(actURL, headers=headerValue)
-# print(actReq)
 
 
-resourcePath = "steps" # calories, steps, distance, floors, elevation, heart
+def intraday_call(activityType, timeStep, date):
+    """Makes a call to pull 1-day worth of data for specific activity.
 
-intraday = auth2_client.intraday_time_series('activities/{}'.format(resourcePath), base_date=yesterday, detail_level='15min')
-pprint(intraday['activities-{}-intraday'.format(resourcePath)], indent=1, width=1)
+    :param activityType: str. Defines what type of activity. Could be from the following: calories, steps, distance,
+    floors, elevation, heart
+    :param timeStep: str. Defines time step for activityType
+    """
+    if activityType == 'heart' and timeStep != '1sec':
+        timeStep = '1sec'
+        print('Changing time step to 1 second')
+    intradayData = auth2_client.intraday_time_series('activities/{}'.format(activityType), base_date=date,
+                                                     detail_level=timeStep)
+    # pprint('Time series data:\n', intradayData['activities-{}-intraday'.format(activityType)], indent=1, width=1)
+    activity_df = intraday_df(intradayData, activityType)
+    return activity_df
 
 
-# MakeAPICall(fitbitURL, AccessToken, RefreshToken)
+def intraday_df(data, activity_type):
+    """Creates dataframe for intraday calls"""
+    time_list = []
+    val_list = []
+    for i in data['activities-{}-intraday'.format(activity_type)]['dataset']:
+        val_list.append(i['value'])
+        time_list.append(i['time'])
+    activity_df = pd.DataFrame({'Heart Rate': val_list, 'Time': time_list})
+    return activity_df
+
+
+def create_csv(dataframe, activity_type, day):
+    """Creates a csv file from a pandas dataframe to the ./files folder as [activity]_[date].csv"""
+    dataframe.to_csv('./files/{0}_{1}.csv'.format(activity_type, day))
+
+
+if __name__ == "__main__":
+    AccessToken = ""
+    RefreshToken = ""
+    AccessToken, RefreshToken = GetConfig()
+    auth2_client = fitbit.Fitbit(clientID, clientSecret, oauth2=True,
+                                 access_token=AccessToken, refresh_token=RefreshToken)
+    yesterday = str((datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d"))
+    today = str(datetime.datetime.now().strftime("%Y-%m-%d"))
+
+    # parameters to fill
+    activity = 'steps'
+    step = '15min'
+    date = yesterday
+
+    body = auth2_client.body()
+    activities = auth2_client.activities()
+    sleep = auth2_client.sleep()
+    activity_df = intraday_call(activity, step, date)
+    create_csv(activity_df, activity, date)
+    print(activity_df)
+
+
+
+    # resourcePath = "steps"
+    # intraday = auth2_client.intraday_time_series('activities/{}'.format(resourcePath), base_date=yesterday, detail_level='15min')
+    # pprint(intraday['activities-{}-intraday'.format(resourcePath)], indent=1, width=1)
+
+    # headerValue = {
+    #         'Authorization': 'Bearer ' + AccessToken
+    #     }
+    # actURL = 'https://api.fitbit.com/1/user/-/activities/steps/date/2019-03-27/1d/15min'
+    # actReq = requests.get(actURL, headers=headerValue)
+    # print(actReq)
+
+    # MakeAPICall(fitbitURL, AccessToken, RefreshToken)
