@@ -1,3 +1,4 @@
+from os import listdir, path
 import pandas as pd
 import numpy as py
 from datetime import datetime, date
@@ -6,6 +7,7 @@ from datetime import datetime, date
 dates, time, triangulation, accuracy, elevation = 'Date', 'Time', 'Triangulation', 'Accuracy', 'Altitude'
 elevation_gain = 'Elevation Gain'
 time_change = 'Delta Time'
+names = 'Name'
 
 
 class Hike:
@@ -19,6 +21,7 @@ class Hike:
         drop_cols = [triangulation, accuracy]
         df = pd.read_csv('./files/hike_trails/{}.csv'.format(self.hike_name), names=headers).\
             drop(drop_cols, axis=1)
+        df.insert(0, names, self.hike_name)
         return df
 
     @staticmethod
@@ -34,6 +37,7 @@ class Hike:
         df[time] = pd.to_datetime(df[time])
         initial_time = df[time].iloc[0]
         df[time_change] = df[time] - initial_time
+        df[time_change] = pd.to_datetime(df[time_change]).dt.time
         df[time] = df[time].dt.time
         df[dates] = pd.to_datetime(df[dates]).dt.date
         return df
@@ -47,24 +51,38 @@ class Hike:
         return df
 
 
+def files_directory():
+    """Creates a list of all files in directory and returns the name for all hikes in ./files/hike_trails"""
+    path_dir = './files/hike_trails'
+    hikes_list = listdir(path_dir)
+    new_list = []
+    for hikes in hikes_list:
+        hike_name = path.splitext(hikes)[0]
+        new_list.append(hike_name)
+    return new_list
+
+
+def concat_dataframes(*args):
+    """Concatenates all dataframes into one df"""
+    result_df = pd.concat(args, sort=False).reset_index(drop=True)
+    return result_df
+
+
 def main():
-    hike_name1 = 'Blood Mountain'
-    hike_name2 = 'East Palisades'
+    all_hikes_list = files_directory()
+    result_df = pd.DataFrame()
+    for hike in all_hikes_list:
+        print('Adding {} to file'.format(hike))
+        init_hike = Hike(hike)
+        df = init_hike.read_df()
+        df = init_hike.corrected_elevation(df)
+        df = init_hike.calc_elevation_gain(df)
+        df = init_hike.calc_time_change(df)
+        result_df = result_df.append(df).reset_index(drop=True)
+    file_name = 'complete_hikes_list'
+    save_path = './files/{}.csv'.format(file_name)
+    print("Saving file to '{}'".format(save_path))
+    result_df.to_csv(save_path)
 
-    hike1 = Hike(hike_name1, highest_altitude=1355)
-    df1 = hike1.read_df()
-    df1 = hike1.corrected_elevation(df1)
-    df1 = hike1.calc_elevation_gain(df1)
-    hike1.calc_time_change(df1)
-    print(df1)
-
-    hike2 = Hike(hike_name2)
-    df2 = hike2.read_df()
-    df2 = hike2.calc_elevation_gain(df2)
-
-    frames = [df1, df2]
-    results = pd.concat(frames, sort=False).reset_index(drop=True)
-
-    # print(results)
 
 main()
