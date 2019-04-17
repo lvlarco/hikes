@@ -146,7 +146,7 @@ def intraday_df(data, activity_type):
     for i in data['activities-{}-intraday'.format(activity_type)]['dataset']:
         val_list.append(i['value'])
         time_list.append(i['time'])
-    activity_df = pd.DataFrame({'Heart Rate': val_list, 'Time': time_list})
+    activity_df = pd.DataFrame({activity_type.capitalize(): val_list, 'Time': time_list})
     return activity_df
 
 
@@ -174,8 +174,9 @@ if __name__ == "__main__":
     specific_date = "2018-04-11"
 
     # parameters to fill
-    activity = 'heart'
-    step = '15min'
+    activity = 'elevation' #heart, calories, steps, distance, floors, elevation
+    step = '1min' #'1sec', '1min', or '15min'
+
     date = specific_date
 
     body = auth2_client.body()
@@ -183,9 +184,6 @@ if __name__ == "__main__":
     sleep = auth2_client.sleep()
     activity_df = intraday_call(activity, step, date)
     create_csv(activity_df, activity, date)
-    # print(activity_df)
-
-
 
     # resourcePath = "steps"
     # intraday = auth2_client.intraday_time_series('activities/{}'.format(resourcePath), base_date=yesterday, detail_level='15min')
