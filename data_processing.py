@@ -47,7 +47,7 @@ class Hike:
         """Calculates ['Time Change'] column in dataframe. Also converts [date] and [time] into datetime type"""
         initial_time = df.index.min()
         df[time_change] = df.index - initial_time
-        df[time_change] = pd.to_datetime(df[time_change]).dt.strftime('%H:%M:%S')
+        df[time_change] = pd.to_datetime(df[time_change]).dt.strftime('%H:%M')
         return df
 
     def corrected_elevation(self, df):
