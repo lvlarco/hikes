@@ -121,11 +121,6 @@ def MakeAPICall(InURL,AccToken,RefToken):
             return False, TokenRefreshedOK
         return False, ErrorInAPI
 
-# server = Oauth2.OAuth2Server(clientID, clientSecret)
-# server.browser_authorize()
-# ACCESS_TOKEN = str(server.fitbit.client.session.token['access_token'])
-# REFRESH_TOKEN = str(server.fitbit.client.session.token['refresh_token'])
-
 
 def intraday_call(activityType, timeStep, date):
     """Makes a call to pull 1-day worth of data for specific activity.
@@ -157,29 +152,38 @@ def intraday_df(data, activity_type):
 
 def create_csv(dataframe, activity_type, day):
     """Creates a csv file from a pandas dataframe to the ./files folder as [activity]_[date].csv"""
-    dataframe.to_csv('./files/{0}_{1}.csv'.format(activity_type, day))
+    filepath = './files/fitbit_data/{0}_{1}.csv'.format(activity_type, day)
+    print('Saving CSV as {}'.format(filepath))
+    dataframe.to_csv(filepath)
 
 
 if __name__ == "__main__":
     AccessToken = ""
     RefreshToken = ""
     AccessToken, RefreshToken = GetConfig()
+
+    # server = Oauth2.OAuth2Server(clientID, clientSecret)
+    # server.browser_authorize()
+    # AccessToken = str(server.fitbit.client.session.token['access_token'])
+    # RefreshToken = str(server.fitbit.client.session.token['refresh_token'])
+
     auth2_client = fitbit.Fitbit(clientID, clientSecret, oauth2=True,
                                  access_token=AccessToken, refresh_token=RefreshToken)
     yesterday = str((datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d"))
     today = str(datetime.datetime.now().strftime("%Y-%m-%d"))
+    specific_date = "2018-04-11"
 
     # parameters to fill
-    activity = 'steps'
+    activity = 'heart'
     step = '15min'
-    date = yesterday
+    date = specific_date
 
     body = auth2_client.body()
     activities = auth2_client.activities()
     sleep = auth2_client.sleep()
     activity_df = intraday_call(activity, step, date)
     create_csv(activity_df, activity, date)
-    print(activity_df)
+    # print(activity_df)
 
 
 
