@@ -8,6 +8,7 @@ dates, time, triangulation, accuracy, elevation = 'Date', 'Time', 'Triangulation
 elevation_gain = 'Elevation Gain'
 time_change = 'Delta Time'
 names = 'Name'
+timestamp = 'Timestamp'
 
 
 class Hike:
@@ -25,6 +26,16 @@ class Hike:
         return df
 
     @staticmethod
+    def resample_df(df, minutes):
+        """Resample data to specific timestamp
+        :param df: dataframe to resample
+        :param minutes: resample size in minutes
+        """
+        minutes_str = '{}T'.format(minutes)
+        resample_df = df.resample(minutes_str).mean()
+        return resample_df
+
+    @staticmethod
     def calc_elevation_gain(df):
         """Calculates ['Elevation Gain'] column in dataframe"""
         initial_elevation = df.iloc[0][elevation]
@@ -34,12 +45,9 @@ class Hike:
     @staticmethod
     def calc_time_change(df):
         """Calculates ['Time Change'] column in dataframe. Also converts [date] and [time] into datetime type"""
-        df[time] = pd.to_datetime(df[time])
-        initial_time = df[time].iloc[0]
-        df[time_change] = df[time] - initial_time
-        df[time_change] = pd.to_datetime(df[time_change]).dt.time
-        df[time] = df[time].dt.time
-        df[dates] = pd.to_datetime(df[dates]).dt.date
+        initial_time = df.index.min()
+        df[time_change] = df.index - initial_time
+        df[time_change] = pd.to_datetime(df[time_change]).dt.strftime('%H:%M:%S')
         return df
 
     def corrected_elevation(self, df):
@@ -48,6 +56,8 @@ class Hike:
             print 'Correcting altitude values'
             max_elevation = df[elevation].max()
             df[elevation] = (self.highest_altitude - max_elevation) + df[elevation]
+        else:
+            print 'No corrected altitude provided for {}'.format(self.hike_name)
         return df
 
     def determine_name_date(self, df):
@@ -102,34 +112,43 @@ def main():
     all_hikes_list = files_directory()
     result_df = pd.DataFrame()
     for hike in all_hikes_list:
-        print('Adding {} to file'.format(hike))
-        init_hike = Hike(hike)
+        print('Processing: {}'.format(hike))
+        H = Hike(hike)
 
-        #Hikes data formatting
-        df = init_hike.read_hike()
-        df = init_hike.corrected_elevation(df)
-        df = init_hike.calc_elevation_gain(df)
-        df = init_hike.calc_time_change(df)
+        #New try
+        headers = [dates, time, triangulation, accuracy, elevation]
+        drop_cols = [triangulation, accuracy]
+        hike_df = pd.read_csv('./files/hike_trails/{}.csv'.format(hike), names=headers).drop(drop_cols, axis=1)
+        hike_df['Timestamp'] = pd.to_datetime(hike_df[dates] + ' ' + hike_df[time])
+        resample_df = hike_df.set_index(hike_df['Timestamp']).resample('5T').mean()
+        resample_df = H.corrected_elevation(resample_df)
+        resample_df = H.calc_elevation_gain(resample_df)
+        resample_df = H.calc_time_change(resample_df)
+        resample_df.insert(0, names, hike)
 
-        #Fitbit data formatting
-        activity = 'steps'
-        hike_date = '2018-04-11'
-        date_dict = init_hike.determine_name_date(df)
-        fitbit_df = init_hike.read_fitbit(activity, hike_date)
-        beg_time, end_time = init_hike.beg_end_time()
-        fitbit_df = init_hike.filter_boundaries(fitbit_df, beg_time, end_time)
+        # #Hikes data formatting
+        # df = init_hike.read_hike()
+        # cols = df.columns.tolist()
+        # cols.insert(0, cols.pop(cols.index('Timestamp')))
+        # df = df.reindex(columns=cols).set_index(df['Timestamp']).resample('5T').mean()
+        # print df
+        # df = init_hike.corrected_elevation(df)
+        # df = init_hike.calc_elevation_gain(df)
+        # df = init_hike.calc_time_change(df)
 
+        # #Fitbit data formatting
+        # activity = 'steps'
+        # hike_date = '2018-04-11'
+        # date_dict = init_hike.determine_name_date(df)
+        # fitbit_df = init_hike.read_fitbit(activity, hike_date)
+        # beg_time, end_time = init_hike.beg_end_time()
+        # fitbit_df = init_hike.filter_boundaries(fitbit_df, beg_time, end_time)
 
-        print fitbit_df
-
-
-
-
-        result_df = result_df.append(df).reset_index(drop=True)
-    # file_name = 'complete_hikes_list'
-    # save_path = './files/{}.csv'.format(file_name)
-    # print("Saving file to '{}'".format(save_path))
-    # result_df.to_csv(save_path)
-
+        result_df = result_df.append(resample_df)
+    file_name = 'complete_hikes_list'
+    save_path = './files/{}.csv'.format(file_name)
+    print("Saving complete list to '{}'".format(save_path))
+    result_df.to_csv(save_path)
+    # print result_df
 
 main()
