@@ -1,5 +1,6 @@
 from os import listdir, path
 import pandas as pd
+import sys
 import numpy as py
 from datetime import datetime, date
 
@@ -22,7 +23,6 @@ class Hike:
         drop_cols = [triangulation, accuracy]
         df = pd.read_csv('./files/hike_trails/{}.csv'.format(self.hike_name), names=headers).drop(drop_cols, axis=1)
         df['Timestamp'] = pd.to_datetime(df[dates] + ' ' + df[time])
-        df.insert(0, names, self.hike_name)
         return df
 
     @staticmethod
@@ -47,7 +47,7 @@ class Hike:
         """Calculates ['Time Change'] column in dataframe. Also converts [date] and [time] into datetime type"""
         initial_time = df.index.min()
         df[time_change] = df.index - initial_time
-        df[time_change] = pd.to_datetime(df[time_change]).dt.strftime('%H:%M:%S')
+        df[time_change] = pd.to_datetime(df[time_change]).dt.strftime('%H:%M')
         return df
 
     def corrected_elevation(self, df):
@@ -68,17 +68,21 @@ class Hike:
                      }
         return date_dict
 
-    def read_fitbit(self, activity, date):
+    @staticmethod
+    def read_fitbit(activity, date):
         """Reads CSV file from Fitbit's activities"""
-        df = pd.read_csv('./files/fitbit_data/{0}_{1}.csv'.format(activity, date), index_col=0)
-        df['Date'] = date
-        df['Timestamp'] = pd.to_datetime(df['Date'] + ' ' + df['Time'])
-        return df
+        try:
+            df = pd.read_csv('./files/fitbit_data/{0}_{1}.csv'.format(activity, date), index_col=0)
+            df['Date'] = date
+            df['Time'] = pd.to_datetime(df.Time).dt.strftime('%H:%M')
+            df['Timestamp'] = pd.to_datetime(df['Date'] + ' ' + df['Time'])
+            return df
+        except IOError as e:
+            print("Error: {}".format(e))
 
     def beg_end_time(self):
-        """Finds beginning and end timestamps of df"""
+        """Finds beginning and end timestamps of hike dataframe"""
         df = self.read_hike()
-        # print df['Timestamp']# = pd.to_datetime(df['Timestamp'])
         beg_time = df['Timestamp'].min()
         end_time = df['Timestamp'].max()
         return beg_time, end_time
@@ -86,8 +90,8 @@ class Hike:
     @staticmethod
     def filter_boundaries(df, bound1, bound2):
         """Filters datatime by boundaries"""
-        return_df = df.loc[bound1 < df['Timestamp']]
-        return_df = return_df.loc[df['Timestamp'] < bound2]
+        return_df = df.loc[bound1 < df.index]
+        return_df = return_df.loc[return_df.index < bound2]
         return return_df
 
 
@@ -110,12 +114,13 @@ def concat_dataframes(*args):
 
 def main():
     all_hikes_list = files_directory()
-    result_df = pd.DataFrame()
+    result_hike_df = pd.DataFrame()
+
     for hike in all_hikes_list:
         print('Processing: {}'.format(hike))
         H = Hike(hike)
 
-        #New try
+        #Hikes data
         headers = [dates, time, triangulation, accuracy, elevation]
         drop_cols = [triangulation, accuracy]
         hike_df = pd.read_csv('./files/hike_trails/{}.csv'.format(hike), names=headers).drop(drop_cols, axis=1)
@@ -125,30 +130,31 @@ def main():
         resample_df = H.calc_elevation_gain(resample_df)
         resample_df = H.calc_time_change(resample_df)
         resample_df.insert(0, names, hike)
+        hike_date = str(resample_df.index[0].strftime('%Y-%m-%d'))
+        result_hike_df = result_hike_df.append(resample_df)
 
-        # #Hikes data formatting
-        # df = init_hike.read_hike()
-        # cols = df.columns.tolist()
-        # cols.insert(0, cols.pop(cols.index('Timestamp')))
-        # df = df.reindex(columns=cols).set_index(df['Timestamp']).resample('5T').mean()
-        # print df
-        # df = init_hike.corrected_elevation(df)
-        # df = init_hike.calc_elevation_gain(df)
-        # df = init_hike.calc_time_change(df)
+        #Fitbit data
+        activity = 'heart'
+        try:
+            fitbit_df = H.read_fitbit(activity, hike_date)
+            fitbit_df.set_index('Timestamp', inplace=True)
+            beg_time, end_time = H.beg_end_time()
+            fitbit_df = H.filter_boundaries(fitbit_df, beg_time, end_time)
+            fitbit_name = '{0}_{1}_{2}.csv'.format(hike, activity, hike_date)
+            fitbit_path = './files/fitbit_data/{}'.format(fitbit_name)
+            print 'Saving Fitbit activity file'
+            fitbit_df.to_csv(fitbit_path)
 
-        # #Fitbit data formatting
-        # activity = 'steps'
-        # hike_date = '2018-04-11'
-        # date_dict = init_hike.determine_name_date(df)
-        # fitbit_df = init_hike.read_fitbit(activity, hike_date)
-        # beg_time, end_time = init_hike.beg_end_time()
-        # fitbit_df = init_hike.filter_boundaries(fitbit_df, beg_time, end_time)
+        except (IOError, AttributeError) as e:
+            print("Error: {}".format(e))
 
-        result_df = result_df.append(resample_df)
-    file_name = 'complete_hikes_list'
-    save_path = './files/{}.csv'.format(file_name)
-    print("Saving complete list to '{}'".format(save_path))
-    result_df.to_csv(save_path)
-    # print result_df
+    try:
+        file_name = 'complete_hikes_list'
+        save_path = './files/{}.csv'.format(file_name)
+        print("Saving complete list to '{}'".format(save_path))
+        result_hike_df.to_csv(save_path)
+
+    except (IOError, AttributeError) as e:
+        print('Error: {}'.format(e))
 
 main()
